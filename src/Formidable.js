@@ -12,6 +12,7 @@ const dezalgo = require('dezalgo');
 const { EventEmitter } = require('events');
 const { StringDecoder } = require('string_decoder');
 const qs = require('qs');
+const { ClientRequest } = require('http');
 
 const toHexoId = hexoid(25);
 const DEFAULT_OPTIONS = {
@@ -104,10 +105,14 @@ class IncomingForm extends EventEmitter {
     return this;
   }
 
+  // TODO: fix this
+  // eslint-disable-next-line max-statements
   parse(req, cb) {
     this.pause = () => {
       try {
-        req.pause();
+        if (req instanceof ClientRequest) {
+          req.pause();
+        }
       } catch (err) {
         // the stream was destroyed
         if (!this.ended) {
@@ -121,7 +126,9 @@ class IncomingForm extends EventEmitter {
 
     this.resume = () => {
       try {
-        req.resume();
+        if (req instanceof ClientRequest) {
+          req.resume();
+        }
       } catch (err) {
         // the stream was destroyed
         if (!this.ended) {
@@ -178,33 +185,54 @@ class IncomingForm extends EventEmitter {
     }
 
     // Parse headers and setup the parser, ready to start listening for data.
-    this.writeHeaders(req.headers);
 
-    // Start listening for data.
-    req
-      .on('error', (err) => {
-        this._error(err);
-      })
-      .on('aborted', () => {
-        this.emit('aborted');
-        this._error(new Error('Request aborted'));
-      })
-      .on('data', (buffer) => {
-        try {
-          this.write(buffer);
-        } catch (err) {
-          this._error(err);
-        }
-      })
-      .on('end', () => {
-        if (this.error) {
-          return;
-        }
+    this.writeHeaders(
+      Object.entries(req.headers).reduce(
+        (acc, [key, value]) => ({
+          ...acc,
+          [key.toLowerCase()]: value,
+        }),
+        {},
+      ),
+    );
+
+    if (!(req instanceof ClientRequest) && req.body) {
+      try {
+        this.write(req.body);
         if (this._parser) {
           this._parser.end();
         }
         this._maybeEnd();
-      });
+      } catch (err) {
+        this._error(err);
+      }
+    } else {
+      // Start listening for data.
+      req
+        .on('error', (err) => {
+          this._error(err);
+        })
+        .on('aborted', () => {
+          this.emit('aborted');
+          this._error(new Error('Request aborted'));
+        })
+        .on('data', (buffer) => {
+          try {
+            this.write(buffer);
+          } catch (err) {
+            this._error(err);
+          }
+        })
+        .on('end', () => {
+          if (this.error) {
+            return;
+          }
+          if (this._parser) {
+            this._parser.end();
+          }
+          this._maybeEnd();
+        });
+    }
 
     return this;
   }
