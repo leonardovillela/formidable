@@ -149,9 +149,10 @@ class IncomingForm extends EventEmitter {
       const files = {};
 
       this.on('field', (name, value) => {
-        if (this.options.multiples && 
-            (this.type === 'multipart' || this.type === 'urlencoded')
-            ) {
+        if (
+          this.options.multiples &&
+          (this.type === 'multipart' || this.type === 'urlencoded')
+        ) {
           const mObj = { [name]: value };
           mockFields = `${mockFields}&${qs.stringify(mObj)}`;
         } else {
@@ -199,10 +200,10 @@ class IncomingForm extends EventEmitter {
     if (!(req instanceof ClientRequest) && req.body) {
       try {
         this.write(req.body);
-        if (this._parser) {
-          this._parser.end();
-        }
-        this._maybeEnd();
+        // if (this._parser) {
+        //  this._parser.end();
+        // }
+        // this._maybeEnd();
       } catch (err) {
         this._error(err);
       }
@@ -459,6 +460,7 @@ class IncomingForm extends EventEmitter {
 
   _parseContentLength() {
     this.bytesReceived = 0;
+    console.log(this.headers);
     if (this.headers['content-length']) {
       this.bytesExpected = parseInt(this.headers['content-length'], 10);
     } else if (this.headers['transfer-encoding'] === undefined) {
